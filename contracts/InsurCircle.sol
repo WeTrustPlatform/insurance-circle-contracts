@@ -58,9 +58,15 @@ contract InsurCircle {
         contributionSize = contributionSize_;
         tokenContract = ERC20TokenInterface(tokenContractAddress_);
         tokenContractAddress = tokenContractAddress_;
+        bool isFound = false;
         for (uint8 i = 0; i < members_.length; i++) {
+            if (organizer_ == members_[i]) {
+                isFound = true;
+                break;
+            }
             addMember(members_[i]);
         }
+        require(isFound == false, "Organizer must not be a member");
     }
 
     /**
