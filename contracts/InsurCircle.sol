@@ -120,18 +120,24 @@ contract InsurCircle {
      */
     function closeCircle() external onlyOrganizer {
         for (uint8 i = 0; i < membersAddresses.length; i++) {
-            User memory member = members[membersAddresses[i]];
+            User storage member = members[membersAddresses[i]];
             require(member.credit - member.debit >= 0, "Credit amount of member should be gt than his/her debit amount");
             if (i < (membersAddresses.length - 1)) {
                 uint256 value = member.credit - member.debit;
                 if (value > 0) {
                     transfer(membersAddresses[i], value);
                 }
+                member.credit = 0;
+                member.debit = 0;
                 continue;
             }
             // Last member should take his/her remmaining money in the contract
             uint256 value = getBalance();
-            transfer(membersAddresses[i], value);
+            if (value > 0) {
+                transfer(membersAddresses[i], value);
+            }
+            member.credit = 0;
+            member.debit = 0;
         }
         endOfROSCA = true;
         emit LogEndOfROSCA();
