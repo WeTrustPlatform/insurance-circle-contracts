@@ -81,4 +81,26 @@ contract('InsurCircle', (accounts) => {
       // console.log(err)
     }
   });
+
+  it('payForDebt - only member can do', async () => {
+    // member 1 pay 10 ETH
+    await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_1})
+    // organizer transfer to MEMBER_2
+    await contract.transfer(MEMBER_2, web3.utils.toWei('5', 'ether'), {from: ORGANIZER})
+    // member 2 pay back 6 eth
+    const result = await contract.payForDebt({value: web3.utils.toWei('6', 'ether'), from: MEMBER_2})
+    assert.equal(result.logs[0].event, 'LogContributionMade')
+    const member2 = await contract.members(MEMBER_2)
+    assert.equal(web3.utils.toWei('1', 'ether'), member2.credit)
+    assert.equal(0n, member2.debit)
+  });
+
+  it('payForDebt - other people cant do do', async () => {
+    try {
+      await contract.payForDebt({value: web3.utils.toWei('10', 'ether'), from: STRANGER})
+      assert.fail("Should not reach here");
+    } catch (err) {
+      // console.log(err)
+    }
+  });
 });

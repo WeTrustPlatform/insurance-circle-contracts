@@ -91,8 +91,8 @@ contract InsurCircle {
         if (member.debit >= value) {
             member.debit -= value;
         } else {
-            member.debit = 0;
             member.credit += (value - member.debit);
+            member.debit = 0;
         }
         emit LogContributionMade(msg.sender, value);
     }
