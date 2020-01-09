@@ -91,8 +91,8 @@ contract InsurCircle {
         if (member.debit >= value) {
             member.debit -= value;
         } else {
-            member.debit = 0;
             member.credit += (value - member.debit);
+            member.debit = 0;
         }
         emit LogContributionMade(msg.sender, value);
     }
@@ -104,14 +104,15 @@ contract InsurCircle {
         require(!endOfROSCA, "Circle is ended");
         require(members[toMember].alive, "Organizer can transfer to member only");
         require(value > 0, "Value to transfer must gt 0");
-        emit LogFundsWithdrawal(msg.sender, value);
-        User storage member = members[msg.sender];
+        User storage member = members[toMember];
         member.debit += value;
         bool isEthCircle = (tokenContractAddress == address(0));
         if (isEthCircle) {
             toMember.transfer(value);
+        } else {
+            tokenContract.transfer(toMember, value);
         }
-        tokenContract.transfer(toMember, value);
+        emit LogFundsWithdrawal(msg.sender, value);
     }
 
     /**
@@ -119,18 +120,24 @@ contract InsurCircle {
      */
     function closeCircle() external onlyOrganizer {
         for (uint8 i = 0; i < membersAddresses.length; i++) {
-            User memory member = members[membersAddresses[i]];
+            User storage member = members[membersAddresses[i]];
             require(member.credit - member.debit >= 0, "Credit amount of member should be gt than his/her debit amount");
             if (i < (membersAddresses.length - 1)) {
                 uint256 value = member.credit - member.debit;
                 if (value > 0) {
                     transfer(membersAddresses[i], value);
                 }
+                member.credit = 0;
+                member.debit = 0;
                 continue;
             }
             // Last member should take his/her remmaining money in the contract
             uint256 value = getBalance();
-            transfer(membersAddresses[i], value);
+            if (value > 0) {
+                transfer(membersAddresses[i], value);
+            }
+            member.credit = 0;
+            member.debit = 0;
         }
         endOfROSCA = true;
         emit LogEndOfROSCA();
@@ -147,8 +154,8 @@ contract InsurCircle {
     /**
      * Return balance of a member.
      */
-    function balanceOf(address _donorAddress) public view returns (uint256) {
-        return (members[_donorAddress].credit - members[_donorAddress].debit);
+    function balanceOf(address _donorAddress) public view returns (int256) {
+        return int256(members[_donorAddress].credit - members[_donorAddress].debit);
     }
 
     function addMember(address payable newMember) internal onlyNonZeroAddress(newMember) {
