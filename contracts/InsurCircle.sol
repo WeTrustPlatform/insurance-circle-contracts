@@ -154,8 +154,8 @@ contract InsurCircle {
     /**
      * Return balance of a member.
      */
-    function balanceOf(address _donorAddress) public view returns (uint256) {
-        return (members[_donorAddress].credit - members[_donorAddress].debit);
+    function balanceOf(address _donorAddress) public view returns (int256) {
+        return int256(members[_donorAddress].credit - members[_donorAddress].debit);
     }
 
     function addMember(address payable newMember) internal onlyNonZeroAddress(newMember) {

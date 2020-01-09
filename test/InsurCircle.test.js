@@ -152,4 +152,24 @@ contract('InsurCircle', (accounts) => {
       // console.log(err)
     }
   });
+
+  it('getBalance - should get correct balance', async () => {
+     // member 1 pay 10 ETH
+     await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_1})
+     // organizer transfer to MEMBER_2
+     await contract.transfer(MEMBER_2, web3.utils.toWei('1', 'ether'), {from: ORGANIZER})
+    const balance = await contract.getBalance();
+    assert.equal(balance, web3.utils.toWei('9', 'ether')); 
+  });
+
+  it('balanceOf - should get correct balance of each member', async () => {
+     // member 1 pay 10 ETH
+     await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_1})
+     // organizer transfer to MEMBER_2
+     await contract.transfer(MEMBER_2, web3.utils.toWei('1', 'ether'), {from: ORGANIZER})
+     const balance1 = await contract.balanceOf(MEMBER_1)
+     assert.equal(balance1, web3.utils.toWei('10', 'ether')) 
+     const balance2 = await contract.balanceOf(MEMBER_2)
+     assert.equal(balance2, -1 * web3.utils.toWei('1', 'ether')) 
+  });
 });
