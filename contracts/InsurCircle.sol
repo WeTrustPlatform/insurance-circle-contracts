@@ -104,14 +104,15 @@ contract InsurCircle {
         require(!endOfROSCA, "Circle is ended");
         require(members[toMember].alive, "Organizer can transfer to member only");
         require(value > 0, "Value to transfer must gt 0");
-        emit LogFundsWithdrawal(msg.sender, value);
-        User storage member = members[msg.sender];
+        User storage member = members[toMember];
         member.debit += value;
         bool isEthCircle = (tokenContractAddress == address(0));
         if (isEthCircle) {
             toMember.transfer(value);
+        } else {
+            tokenContract.transfer(toMember, value);
         }
-        tokenContract.transfer(toMember, value);
+        emit LogFundsWithdrawal(msg.sender, value);
     }
 
     /**
