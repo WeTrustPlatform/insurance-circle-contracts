@@ -21,6 +21,7 @@ contract InsurCircle {
     event LogContributionMade(address indexed user, uint256 amount);
     event LogFundsWithdrawal(address indexed user, uint256 amount);
     event LogEndOfROSCA();
+    event LogDisabledMember(address indexed user);
 
     struct User {
         uint256 credit;  // total amount user has contributed
@@ -121,6 +122,9 @@ contract InsurCircle {
     function closeCircle() external onlyOrganizer {
         for (uint8 i = 0; i < membersAddresses.length; i++) {
             User storage member = members[membersAddresses[i]];
+            if (!member.alive) {
+                continue;
+            }
             require(member.credit - member.debit >= 0, "Credit amount of member should be gt than his/her debit amount");
             if (i < (membersAddresses.length - 1)) {
                 uint256 value = member.credit - member.debit;
@@ -154,8 +158,20 @@ contract InsurCircle {
     /**
      * Return balance of a member.
      */
-    function balanceOf(address _donorAddress) public view returns (int256) {
-        return int256(members[_donorAddress].credit - members[_donorAddress].debit);
+    function balanceOf(address user) public view returns (int256) {
+        require(members[user].alive, "User is not active anymore");
+        return int256(members[user].credit - members[user].debit);
+    }
+
+    /**
+     * If a member wants to quit, he needs to request organizer to do this.
+     */
+    function disableMember(address payable aMember) external onlyOrganizer {
+        require(!endOfROSCA, "Circle is ended");
+        require(members[aMember].alive, "User is not active, unable to disable");
+        User storage member = members[aMember];
+        member.alive = false;
+        emit LogDisabledMember(aMember);
     }
 
     function addMember(address payable newMember) internal onlyNonZeroAddress(newMember) {
