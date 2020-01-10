@@ -25,6 +25,21 @@ contract('InsurCircle', (accounts) => {
     )
   });
 
+  it('constructor - organizer must not be a member', async () => {
+    try {
+      await InsurCircle.new(
+        '0x0000000000000000000000000000000000000000',
+        ORGANIZER,
+        ROUND_PERIOD_IN_SEC,
+        START_TIME.getTime(),
+        CONTRIBUTION_SIZE,
+        [MEMBER_0, MEMBER_1, MEMBER_2]
+      )
+      assert.fail('Should not reach here')
+    } catch (err) {
+    }
+  });
+
   it('payForRound - member should be able to contribute', async () => {
     const result = await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_1})
     assert.equal(result.logs[0].event, 'LogContributionMade')
@@ -140,7 +155,6 @@ contract('InsurCircle', (accounts) => {
       await contract.closeCircle({from: STRANGER})
       assert.fail("Should not reach here");
     } catch (err) {
-      // console.log(err)
     }
   });
 
@@ -149,7 +163,6 @@ contract('InsurCircle', (accounts) => {
       await contract.closeCircle({from: STRANGER})
       assert.fail("Should not reach here");
     } catch (err) {
-      // console.log(err)
     }
   });
 
@@ -171,5 +184,48 @@ contract('InsurCircle', (accounts) => {
      assert.equal(balance1, web3.utils.toWei('10', 'ether')) 
      const balance2 = await contract.balanceOf(MEMBER_2)
      assert.equal(balance2, -1 * web3.utils.toWei('1', 'ether')) 
+  });
+
+  it('disableMember - should be a success', async () => {
+    const result = await contract.disableMember(MEMBER_2, {from: ORGANIZER})
+    assert.equal(result.logs[0].event, 'LogDisabledMember')
+    // cannot transfer to that member anymore
+    try {
+      await contract.transfer(MEMBER_2, web3.utils.toWei('1', 'ether'), {from: ORGANIZER})
+      assert.fail("Failed because user is not active")
+    } catch (err) {
+    }
+    // cannot get balance of that member anymore
+    try {
+      await contract.balanceOf(MEMBER_2)
+      assert.fail("Failed because user is not active")
+    } catch (err) {
+    }
+  });
+
+  it('disableMember - only organizer can do it', async () => {
+    try {
+      await contract.disableMember(MEMBER_2, {from: STRANGER})
+      assert.fail("Stranger should not be allowed to disable member")
+    } catch (err) {
+    }
+  });
+
+  it('disableMember - circle ended already', async () => {
+    try {
+      await contract.closeCircle({from: ORGANIZER})
+      await contract.disableMember(MEMBER_2, {from: ORGANIZER})
+      assert.fail("Circle is closed")
+    } catch (err) {
+    }
+  });
+
+  it('disableMember - member is disabled already already', async () => {
+    await contract.disableMember(MEMBER_2, {from: ORGANIZER})
+    try {
+      await contract.disableMember(MEMBER_2, {from: ORGANIZER})
+      assert.fail("Member is disabled already")
+    } catch (err) {
+    }
   });
 });
