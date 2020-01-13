@@ -7,6 +7,7 @@ contract InsurCircle {
     using SafeMath for uint256;
 
     string public constant VERSION = "0.0.1";
+    uint256 public constant EXPIRED_IN = 52 weeks;
     address payable public organizer;
     mapping(address => User) public members;
     address payable[] public membersAddresses;  // for iterating through members' addresses
@@ -17,11 +18,13 @@ contract InsurCircle {
     ERC20TokenInterface public tokenContract;  // public - allow easy verification of token contract.
     address public tokenContractAddress;
     bool public endOfROSCA = false;
+    uint256 public safetyHatchTime;
 
     event LogContributionMade(address indexed user, uint256 amount);
     event LogFundsWithdrawal(address indexed user, uint256 amount);
     event LogEndOfROSCA();
     event LogDisabledMember(address indexed user);
+    event Claimed(address indexed user, uint256 value);
 
     struct User {
         uint256 credit;  // total amount user has contributed
@@ -67,6 +70,7 @@ contract InsurCircle {
             }
             addMember(members_[i]);
         }
+        safetyHatchTime = startTime + EXPIRED_IN;
         require(isFound == false, "Organizer must not be a member");
     }
 
@@ -78,6 +82,7 @@ contract InsurCircle {
         User storage member = members[msg.sender];
         uint256 value = validateAndReturnContribution();
         member.credit += value;
+        safetyHatchTime = now + EXPIRED_IN;
         emit LogContributionMade(msg.sender, value);
     }
 
@@ -95,6 +100,7 @@ contract InsurCircle {
             member.credit += (value - member.debit);
             member.debit = 0;
         }
+        safetyHatchTime = now + EXPIRED_IN;
         emit LogContributionMade(msg.sender, value);
     }
 
@@ -105,15 +111,7 @@ contract InsurCircle {
         require(!endOfROSCA, "Circle is ended");
         require(members[toMember].alive, "Organizer can transfer to member only");
         require(value > 0, "Value to transfer must gt 0");
-        User storage member = members[toMember];
-        member.debit += value;
-        bool isEthCircle = (tokenContractAddress == address(0));
-        if (isEthCircle) {
-            toMember.transfer(value);
-        } else {
-            tokenContract.transfer(toMember, value);
-        }
-        emit LogFundsWithdrawal(msg.sender, value);
+        doTransfer(toMember, value);
     }
 
     /**
@@ -171,7 +169,44 @@ contract InsurCircle {
         require(members[aMember].alive, "User is not active, unable to disable");
         User storage member = members[aMember];
         member.alive = false;
+        safetyHatchTime = now + EXPIRED_IN;
         emit LogDisabledMember(aMember);
+    }
+
+    function claim() external onlyFromMember {
+        require(!endOfROSCA, "Circle is ended");
+        require(now >= safetyHatchTime, "Not at the right time for safety hatch");
+        // if this is the last user, withdraw the remaining balance
+        uint8 numPositiveBalanceUser = 0;
+        // real balance in the contract is lte max balance
+        uint256 maxBalance;
+        for (uint8 i = 0; i < membersAddresses.length; i++) {
+            User memory member = members[membersAddresses[i]];
+            if (member.alive && balanceOf(membersAddresses[i]) > 0) {
+                maxBalance += uint256(balanceOf(membersAddresses[i]));
+                numPositiveBalanceUser++;
+            }
+            if (membersAddresses[i] == msg.sender) {
+                require(member.alive, "Member is not alive");
+                require(member.credit - member.debit > 0, "Credit amount of member should be gt than his/her debit amount");
+            }
+        }
+        // after this for loop, user is eligible to claim
+        User storage member = members[msg.sender];
+        uint256 contractBalance = getBalance();
+        if (numPositiveBalanceUser == 1) {
+            doTransfer(msg.sender, contractBalance);
+            member.alive = false;
+            emit Claimed(msg.sender, contractBalance);
+            return;
+        }
+
+        // else withdraw based on ratio
+        uint256 memberBalance = member.credit - member.debit;
+        uint256 available = contractBalance.mul(memberBalance).div(maxBalance);
+        doTransfer(msg.sender, available);
+        member.alive = false;
+        emit Claimed(msg.sender, available);
     }
 
     function addMember(address payable newMember) internal onlyNonZeroAddress(newMember) {
@@ -193,5 +228,18 @@ contract InsurCircle {
         }
         require(tokenContract.transferFrom(msg.sender, address(this), value), "Token contract should allow to transfer to this contract");
         return value;
+    }
+
+    function doTransfer(address payable toMember, uint256 value) internal {
+        User storage member = members[toMember];
+        member.debit += value;
+        bool isEthCircle = (tokenContractAddress == address(0));
+        if (isEthCircle) {
+            toMember.transfer(value);
+        } else {
+            tokenContract.transfer(toMember, value);
+        }
+        safetyHatchTime = now + EXPIRED_IN;
+        emit LogFundsWithdrawal(msg.sender, value);
     }
 }
