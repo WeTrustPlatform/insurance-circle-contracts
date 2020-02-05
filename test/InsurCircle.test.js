@@ -19,7 +19,7 @@ contract('InsurCircle', (accounts) => {
       '0x0000000000000000000000000000000000000000',
       ORGANIZER,
       ROUND_PERIOD_IN_SEC,
-      START_TIME.getTime(),
+      Math.floor(START_TIME.getTime() / 1000),
       CONTRIBUTION_SIZE,
       [MEMBER_0, MEMBER_1, MEMBER_2]
     )
@@ -31,7 +31,7 @@ contract('InsurCircle', (accounts) => {
         '0x0000000000000000000000000000000000000000',
         ORGANIZER,
         ROUND_PERIOD_IN_SEC,
-        START_TIME.getTime(),
+        Math.floor(START_TIME.getTime() / 1000),
         CONTRIBUTION_SIZE,
         [MEMBER_0, MEMBER_1, MEMBER_2]
       )
