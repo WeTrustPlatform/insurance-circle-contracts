@@ -7,6 +7,7 @@ contract InsurCircle {
     using SafeMath for uint256;
 
     string public constant VERSION = "0.0.1";
+    uint public constant MAX_MEMBER = 256;
     uint256 public constant EXPIRED_IN = 52 weeks;
     address payable public organizer;
     mapping(address => User) public members;
@@ -55,7 +56,7 @@ contract InsurCircle {
           uint128 contributionSize_,
           address payable[] memory members_
     ) public {
-        require(roundPeriodInSecs_ != 0 && members_.length > 1 && members_.length <= 256, "Constructor not pass validation");
+        require(roundPeriodInSecs_ != 0 && members_.length > 1 && members_.length <= MAX_MEMBER, "Constructor not pass validation");
         organizer = organizer_;
         roundPeriodInSecs = roundPeriodInSecs_;
         startTime = startTime_;
@@ -87,24 +88,6 @@ contract InsurCircle {
     }
 
     /**
-     * Member contribution to pay for his debt.
-     * Credit user if he pay more than his debt.
-     */
-    function payForDebt() external payable onlyFromMember {
-        require(!endOfROSCA, "Circle is ended");
-        User storage member = members[msg.sender];
-        uint256 value = validateAndReturnContribution();
-        if (member.debit >= value) {
-            member.debit -= value;
-        } else {
-            member.credit += (value - member.debit);
-            member.debit = 0;
-        }
-        safetyHatchTime = now + EXPIRED_IN;
-        emit LogContributionMade(msg.sender, value);
-    }
-
-    /**
      * Only organizer can transfer to member.
      */
     function transfer(address payable toMember, uint256 value) public onlyOrganizer {
@@ -118,28 +101,36 @@ contract InsurCircle {
      * Only organizer can close the circle.
      */
     function closeCircle() external onlyOrganizer {
+        require(!endOfROSCA, "Circle is ended");
+        address payable[] memory eligibleMembers = new address payable[](MAX_MEMBER);
+        uint8 numEligible = 0;
+        uint256 contractBalance = getBalance();
+        // real balance in the contract is lte max balance
+        uint256 maxBalance;
         for (uint8 i = 0; i < membersAddresses.length; i++) {
-            User storage member = members[membersAddresses[i]];
+            User memory member = members[membersAddresses[i]];
             if (!member.alive) {
                 continue;
             }
-            require(member.credit - member.debit >= 0, "Credit amount of member should be gt than his/her debit amount");
-            if (i < (membersAddresses.length - 1)) {
-                uint256 value = member.credit - member.debit;
+            eligibleMembers[numEligible] = membersAddresses[i];
+            numEligible++;
+            maxBalance += members[membersAddresses[i]].credit;
+        }
+        for (uint8 i = 0; i < numEligible; i++) {
+            User storage member = members[eligibleMembers[i]];
+            if (i < numEligible - 1) {
+                uint256 memberBalance = member.credit - member.debit;
+                uint256 value = contractBalance.mul(memberBalance).div(maxBalance);
                 if (value > 0) {
-                    transfer(membersAddresses[i], value);
+                    transfer(eligibleMembers[i], value);
                 }
-                member.credit = 0;
-                member.debit = 0;
                 continue;
             }
             // Last member should take his/her remmaining money in the contract
             uint256 value = getBalance();
             if (value > 0) {
-                transfer(membersAddresses[i], value);
+                transfer(eligibleMembers[i], value);
             }
-            member.credit = 0;
-            member.debit = 0;
         }
         endOfROSCA = true;
         emit LogEndOfROSCA();
@@ -191,7 +182,7 @@ contract InsurCircle {
                 require(member.credit - member.debit > 0, "Credit amount of member should be gt than his/her debit amount");
             }
         }
-        // after this for loop, user is eligible to claim
+        // after the above for loop, user is eligible to claim
         User storage member = members[msg.sender];
         uint256 contractBalance = getBalance();
         if (numPositiveBalanceUser == 1) {
