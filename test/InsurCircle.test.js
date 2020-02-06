@@ -97,37 +97,15 @@ contract('InsurCircle', (accounts) => {
     }
   });
 
-  it('payForDebt - only member can do', async () => {
-    // member 1 pay 10 ETH
-    await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_1})
-    // organizer transfer to MEMBER_2
-    await contract.transfer(MEMBER_2, web3.utils.toWei('5', 'ether'), {from: ORGANIZER})
-    // member 2 pay back 6 eth
-    const result = await contract.payForDebt({value: web3.utils.toWei('6', 'ether'), from: MEMBER_2})
-    assert.equal(result.logs[0].event, 'LogContributionMade')
-    const member2 = await contract.members(MEMBER_2)
-    assert.equal(web3.utils.toWei('1', 'ether'), member2.credit)
-    assert.equal(0n, member2.debit)
-  });
-
-  it('payForDebt - other people cant do do', async () => {
-    try {
-      await contract.payForDebt({value: web3.utils.toWei('10', 'ether'), from: STRANGER})
-      assert.fail("Should not reach here");
-    } catch (err) {
-      // console.log(err)
-    }
-  });
-
   it('closeCircle - normal flow', async () => {
     let endRosca = await contract.endOfROSCA();
     assert.equal(endRosca, false);
     // member 1 pay 10 ETH
     await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_1})
     // organizer transfer to MEMBER_2
-    await contract.transfer(MEMBER_2, web3.utils.toWei('5', 'ether'), {from: ORGANIZER})
+    await contract.transfer(MEMBER_2, web3.utils.toWei('4', 'ether'), {from: ORGANIZER})
     // member 2 pay back 6 eth
-    await contract.payForDebt({value: web3.utils.toWei('6', 'ether'), from: MEMBER_2})
+    await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_2})
     // close circle
     const result = await contract.closeCircle({from: ORGANIZER})
     assert.equal(result.logs[0].event, 'LogFundsWithdrawal')
@@ -135,28 +113,20 @@ contract('InsurCircle', (accounts) => {
     assert.equal(result.logs[2].event, 'LogEndOfROSCA')
     const member1 =  await contract.members(MEMBER_1)
     const member2 =  await contract.members(MEMBER_2)
-    assert.equal(0n, member1.credit)
-    assert.equal(0n, member1.debit)
-    assert.equal(0n, member2.credit)
-    assert.equal(0n, member2.debit)
+    // same credit
+    assert.equal(member1.credit, web3.utils.toWei('10', 'ether'))
+    // debit = 8 following 1:1 ratio
+    assert.equal(member1.debit, web3.utils.toWei('8', 'ether'))
+    // same credit
+    assert.equal(member2.credit, web3.utils.toWei('10', 'ether'))
+    // debit = 4+8 = 12
+    assert.equal(member2.debit, web3.utils.toWei('12', 'ether'))
     endRosca = await contract.endOfROSCA();
     assert.equal(endRosca, true);
     const balance = await contract.getBalance();
     assert.equal(balance, 0);
   });
-
-  it('closeCircle - cannot close because one account is negative', async () => {
-    try {
-      // member 1 pay 10 ETH
-      await contract.payForRound({value: web3.utils.toWei('10', 'ether'), from: MEMBER_1})
-      // organizer transfer to MEMBER_2
-      await contract.transfer(MEMBER_2, web3.utils.toWei('5', 'ether'), {from: ORGANIZER})
-
-      await contract.closeCircle({from: STRANGER})
-      assert.fail("Should not reach here");
-    } catch (err) {
-    }
-  });
+  
 
   it('closeCircle - stranger cant do it', async () => {
     try {
