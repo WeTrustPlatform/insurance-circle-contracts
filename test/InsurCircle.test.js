@@ -66,6 +66,8 @@ contract('InsurCircle', (accounts) => {
     const result = await contract.transfer(MEMBER_2, web3.utils.toWei('5', 'ether'), {from: ORGANIZER})
     // test verification
     assert.equal(result.logs[0].event, 'LogFundsWithdrawal')
+    assert.equal(result.logs[0].args[0], MEMBER_2)
+    assert.equal(web3.utils.toWei('5', 'ether'), result.logs[0].args[1])
     const balance = await web3.eth.getBalance(MEMBER_2)
     assert.equal(balance - oldBalance, web3.utils.toWei('5', 'ether'))
     const member2 = await contract.members(MEMBER_2)
