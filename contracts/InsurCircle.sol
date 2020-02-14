@@ -231,6 +231,6 @@ contract InsurCircle {
             tokenContract.transfer(toMember, value);
         }
         safetyHatchTime = now + EXPIRED_IN;
-        emit LogFundsWithdrawal(msg.sender, value);
+        emit LogFundsWithdrawal(toMember, value);
     }
 }
