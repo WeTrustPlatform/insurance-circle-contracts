@@ -47,7 +47,7 @@ contract InsurCircle {
         require(toCheck != address(0), "Not accept address Zero");
         _;
     }
-    
+
     constructor(
           address tokenContractAddress_,  // pass 0 to use ETH
           address payable organizer_,
@@ -105,6 +105,13 @@ contract InsurCircle {
         address payable[] memory eligibleMembers = new address payable[](MAX_MEMBER);
         uint8 numEligible = 0;
         uint256 contractBalance = getBalance();
+
+        if (contractBalance == 0) {
+            endOfROSCA = true;
+            emit LogEndOfROSCA();
+            return;
+        }
+
         // real balance in the contract is lte max balance
         uint256 maxBalance;
         for (uint8 i = 0; i < membersAddresses.length; i++) {
